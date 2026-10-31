@@ -3,10 +3,10 @@ workflows:
     name: Android Workflow
     max_build_duration: 60
     instance_type: mac_mini_m1
+    working_directory: appt3p
     scripts:
       - name: Build Android APK
         script: |
-          mkdir -p build/app/outputs/flutter-apk
-          echo "Build ready"
+          flutter build apk --release
     artifacts:
-      - build/app/outputs/flutter-apk/*.apk
+      - appt3p/build/app/outputs/flutter-apk/*.apk
