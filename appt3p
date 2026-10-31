@@ -1,0 +1,285 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+void main() {
+  runApp(const T3PApplicationCompleteApp());
+}
+
+class T3PApplicationCompleteApp extends StatelessWidget {
+  const T3PApplicationCompleteApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (_) => QuizProvider(),
+      builder: (context, _) => MaterialApp(
+        title: 'T3P Quiz Master Premium',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          useMaterial3: true,
+          colorSchemeSeed: const Color(0xFF1A237E),
+          scaffoldBackgroundColor: const Color(0xFFF5F7FA),
+        ),
+        home: const MainDashboardScreen(),
+      ),
+    );
+  }
+}
+
+class QuizProvider extends ChangeNotifier {
+  
+  int _currentModuleIndex = 0;
+  int _currentQuestionIndex = 0;
+  int? _selectedAnswer;
+  bool _showExplanation = false;
+
+  int get currentModuleIndex => _currentModuleIndex;
+  int get currentQuestionIndex => _currentQuestionIndex;
+  int? get selectedAnswer => _selectedAnswer;
+  bool get showExplanation => _showExplanation;
+
+  void selectModule(int index) {
+    _currentModuleIndex = index;
+    _currentQuestionIndex = 0;
+    _selectedAnswer = null;
+    _showExplanation = false;
+    notifyListeners();
+  }
+
+  void selectAnswer(int index) {
+    _selectedAnswer = index;
+    _showExplanation = true;
+    notifyListeners();
+  }
+
+  void nextQuestion() {
+    if (_currentQuestionIndex < (T3PDatabase.modules[_currentModuleIndex]['questions'] as List).length - 1) {
+      _currentQuestionIndex++;
+      _selectedAnswer = null;
+      _showExplanation = false;
+      notifyListeners();
+    }
+  }
+}
+
+class MainDashboardScreen extends StatelessWidget {
+  const MainDashboardScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("T3P Quiz Master")),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Expanded(
+              child: ListView.builder(
+                itemCount: T3PDatabase.modules.length,
+                itemBuilder: (context, index) {
+                  final module = T3PDatabase.modules[index];
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    child: ListTile(
+                      leading: Icon(module['icon'] as IconData, color: module['color'] as Color),
+                      title: Text(module['title'] as String),
+                      trailing: const Icon(Icons.arrow_forward_ios),
+                      onTap: () {
+                        context.read<QuizProvider>().selectModule(index);
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const QuizScreen()));
+                      },
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class QuizScreen extends StatelessWidget {
+  const QuizScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<QuizProvider>(builder: (context, provider, _) {
+      final module = T3PDatabase.modules[provider.currentModuleIndex];
+      final questions = module['questions'] as List<Map<String, dynamic>>;
+      final question = questions[provider.currentQuestionIndex];
+      final options = question['options'] as List<String>;
+
+      return Scaffold(
+        appBar: AppBar(title: Text(module['title'] as String)),
+        body: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text("Question ${provider.currentQuestionIndex + 1}/${questions.length}", style: Theme.of(context).textTheme.titleSmall),
+              const SizedBox(height: 10),
+              Text(question['q'] as String, style: Theme.of(context).textTheme.bodyLarge),
+              const SizedBox(height: 20),
+              ...List.generate(options.length, (i) {
+                final isSelected = provider.selectedAnswer == i;
+                final isCorrect = i == question['answer'];
+                Color color = Colors.white;
+                if (provider.showExplanation) {
+                  color = isCorrect ? Colors.green.shade100 : (isSelected ? Colors.red.shade100 : Colors.white);
+                }
+                return Card(
+                  color: color,
+                  child: ListTile(
+                    title: Text(options[i]),
+                    onTap: provider.showExplanation ? null : () => provider.selectAnswer(i),
+                  ),
+                );
+              }),
+              if (provider.showExplanation) ...[
+                const SizedBox(height: 20),
+                Text("Explication :", style: Theme.of(context).textTheme.titleMedium),
+                Text(question['expl'] as String),
+                const Spacer(),
+                ElevatedButton(
+                  onPressed: provider.nextQuestion,
+                  child: const Text("Question Suivante"),
+                )
+              ]
+            ],
+          ),
+        ),
+      );
+    });
+  }
+}
+
+class T3PDatabase {
+  static final List<Map<String, dynamic>> modules = [
+    {
+      "id": "A",
+      "title": "Tronc Commun - Réglementation T3P",
+      "icon": Icons.gavel,
+      "color": const Color(0xFF1A237E),
+      "questions": [
+        {
+          "q": "Un exploitant est inscrit au REVTC, mais son conducteur n'a pas encore sa carte professionnelle VTC physique. Peut-il débuter les courses ?",
+          "options": ["A. Oui, avec l'attestation de réussite à l'examen.", "B. Non, l'inscription au registre et la détention de la carte pro sont deux obligations distinctes.", "C. Oui, si la plateforme accepte sa connexion."],
+          "answer": 1,
+          "expl": "La réussite à l'examen ne donne pas le droit de conduire immédiatement. Le chauffeur doit détenir sa carte professionnelle physique lors de tout contrôle routier."
+        },
+        {
+          "q": "Un taxi circulant hors du ressort de son ADS et un conducteur VMDTR sont hélés en direct sur la voie publique. Qui peut prendre le client ?",
+          "options": ["A. Le taxi, car son ADS l'autorise à marauder partout en France.", "B. Le VMDTR, car l'accord verbal sur le prix suffit.", "C. Ni l'un ni l'autre sans une réservation préalable écrite et justifiable."],
+          "answer": 2,
+          "expl": "La maraude physique est exclusive au taxi dans son ressort territorial d'ADS. Hors de ce secteur ou pour un VMDTR/VTC, la réservation préalable est obligatoire."
+        },
+        {
+          "q": "Quelle est la durée de validité de la carte professionnelle d'un conducteur VTC ?",
+          "options": ["A. 3 ans", "B. 5 ans", "C. 10 ans"],
+          "answer": 1,
+          "expl": "La carte professionnelle VTC a une durée de validité de 5 ans. Son renouvellement exige le suivi d'une formation continue obligatoire de 14 heures."
+        },
+        {
+          "q": "Quelle peine maximale encourt un conducteur T3P pour le refus discriminatoire de prise en charge d'un couple homosexuel ?",
+          "options": ["A. Une amende forfaitaire de 135 €.", "B. 1 an d'emprisonnement et 15 000 € d'amende.", "C. 3 ans d'emprisonnement et 45 000 € d'amende selon l'article 225-2 du Code pénal."],
+          "answer": 2,
+          "expl": "Le refus de service fondé sur l'orientation sexuelle constitue un délit de discrimination, puni de 3 ans de prison et 45 000 € d'amende."
+        },
+        {
+          "q": "Un chauffeur refuse d'accueillir à bord une personne malvoyante accompagnée de son chien guide. Que prévoit la législation ?",
+          "options": ["A. Le chauffeur a le droit de refuser s'il applique un tarif 'nettoyage'.", "B. C'est interdit, l'accès des chiens guides est obligatoire, gratuit et sans aucun supplément.", "C. Les personnes malvoyantes doivent obligatoirement commander un véhicule spécifique TPMR."],
+          "answer": 1,
+          "expl": "Les chiens guides sont obligatoirement admis à bord des véhicules T3P sans aucun supplément financier. Le refus constitue un délit de discrimination."
+        },
+        {
+          "q": "Depuis la loi Grandguillaume, quelle autorité publique centralise et gère l'organisation des examens d'accès au secteur T3P ?",
+          "options": ["A. Les préfectures de département.", "B. Les Chambres de Métiers et de l'Artisanat (CMA).", "C. Les directions régionales de l'environnement (DREAL)."],
+          "answer": 1,
+          "expl": "La loi Grandguillaume a confié la gestion, l'organisation et la centralisation des examens théoriques et pratiques du T3P aux Chambres de Métiers et de l'Artisanat."
+        },
+        {
+          "q": "Quelle est la capacité de transport maximale (conducteur compris) autorisée pour un véhicule de transport public particulier ?",
+          "options": ["A. Maximum 7 places.", "B. Maximum 9 places (8 passagers + 1 conducteur).", "C. Maximum 10 places."],
+          "answer": 1,
+          "expl": "La définition légale du T3P limite la capacité des véhicules à moins de 10 places, soit un maximum de 9 places assises au total, chauffeur inclus."
+        },
+        {
+          "q": "Quel numéro d'écoute national peut être communiqué à un passager victime de violences sexuelles ou sexistes ?",
+          "options": ["A. Le 3117", "B. Le 3919 (Violences Femmes Info)", "C. Le 3928"],
+          "answer": 1,
+          "expl": "Le 3919 est le numéro national d'écoute gratuit et anonyme pour les femmes victimes de violences. Le 3117 concerne uniquement les transports en commun ferrés."
+        },
+        {
+          "q": "Quelle est la sanction encourue par un conducteur en cas de défaut d'affichage visible de sa carte professionnelle sur le pare-brise ?",
+          "options": ["A. Une amende de 1ère ou 2ème classe (35 €).", "B. Une amende de 4ème classe (135 €) et retrait de 3 points.", "C. La suspension immédiate du permis de conduire."],
+          "answer": 0,
+          "expl": "La non-apposition visible de la carte professionnelle sur le pare-brise est une infraction contraventionnelle de 1ère ou 2ème classe selon les cas."
+        },
+        {
+          "q": "Quelle est la définition exacte d'un service de transport collectif régulier par rapport au T3P ?",
+          "options": ["A. Une course commandée par une personne pour un trajet unique.", "B. Un service offert à la place dont l'itinéraire, les arrêts, les horaires et les tarifs sont fixés et publiés à l'avance.", "C. Un trajet de covoiturage avec partage des frais réels."],
+          "answer": 1,
+          "expl": "Le transport régulier (ex: bus, navettes à horaire fixe) est interdit aux conducteurs T3P, qui effectuent uniquement des services personnalisés à la demande."
+        },
+        {
+          "q": "Un conducteur VTC souhaite s'arrêter sur une station réservée aux Taxis pour attendre un client ayant réservé. En a-t-il le droit ?",
+          "options": ["A. Oui, si l'attente est inférieure à 15 minutes.", "B. Oui, car il fait partie de la famille du T3P.", "C. Non, les stations de taxis sont strictement réservées aux taxis titulaires d'une ADS dans leur ressort."],
+          "answer": 2,
+          "expl": "Le statut de VTC ne donne aucun droit d'usage des stations de taxis ou des voies de bus réservées, sauf signalisation locale explicitement contraire."
+        },
+        {
+          "q": "Dans les gares et aéroports, à combien de temps maximum avant l'horaire de prise en charge l'attente d'un client VTC est-elle limitée sur la voie publique ?",
+          "options": ["A. 30 minutes", "B. 1 heure", "C. 2 heures"],
+          "answer": 1,
+          "expl": "Sur les voies ouvertes à la circulation publique des gares et aéroports, le stationnement d'un VTC ou VMDTR est limité à 1 heure maximum avant l'horaire de prise en charge réservé."
+        }
+      ]
+    },
+    {
+      "id": "B",
+      "title": "Tronc Commun - Gestion & Fiscalité",
+      "icon": Icons.euro,
+      "color": const Color(0xFFE65100),
+      "questions": [
+        {
+          "q": "Où est comptabilisé, à la date de clôture de l'exercice, le montant des achats de fournitures consommables entièrement utilisées ?",
+          "options": ["A. Dans la dotation aux amortissements.", "B. Dans les créances fournisseurs à l'actif.", "C. Au compte de résultat (dans les charges de l'exercice).", "D. Au passif du bilan comptable."],
+          "answer": 2,
+          "expl": "Les matières consommables entièrement utilisées au cours de l'exercice comptable constituent des charges d'exploitation de l'année et s'inscrivent au compte de résultat."
+        },
+        {
+          "q": "Un véhicule professionnel est acquis pour 22 000 € HT le 1er avril. Calculez sa dotation aux amortissements linéaires pour la première année sur une base de 4 ans.",
+          "options": ["A. 5 500 €", "B. 4 125 €", "C. 16 574 €", "D. 5 885 €"],
+          "answer": 1,
+          "expl": "Dotation annuelle pleine = 22 000 / 4 = 5 500 €. Application du prorata temporis pour 9 mois d'utilisation (d'avril à décembre) : 5 500 € * 9/12 = 4 125 €."
+        },
+        {
+          "q": "Mme Sophie acquiert et met en service un véhicule le 1er mars 2023 pour 24 000 € HT, amortissable linéairement sur 5 ans. Calculez sa VNC au 31 décembre 2026.",
+          "options": ["A. 7 500 €", "B. 5 600 €", "C. 1 500 €", "D. 0 €"],
+          "answer": 1,
+          "expl": "Dotation annuelle = 24 000 / 5 = 4 800 € (soit 400 €/mois). Amortissements cumulés : 2023 (10 mois = 4 000 €) + 2024 (4 800 €) + 2025 (4 800 €) + 2026 (4 800 €) = 18 400 €. VNC = 24 000 - 18 400 = 5 600 €."
+        },
+        {
+          "q": "Selon le Code de commerce, quelle est la durée légale minimale de conservation des documents et pièces comptables d'une entreprise ?",
+          "options": ["A. 1 an", "B. 3 ans", "C. 5 ans", "D. 10 ans"],
+          "answer": 3,
+          "expl": "Le Code de commerce impose aux professionnels de conserver l'ensemble des livres comptables et pièces justificatives (factures) pendant une durée de 10 ans."
+        },
+        {
+          "q": "Le coût de revient d'une prestation T3P est de 22 €. Vous souhaitez réaliser une marge de 20 % sur le PRIX DE VENTE net de taxe. Quel sera votre prix ?",
+          "options": ["A. 26,00 €", "B. 26,40 €", "C. 27,50 €", "D. 31,20 €"],
+          "answer": 2,
+          "expl": "Calcul de marge sur prix de vente : Prix HT = Coût / (1 - Taux de marge) = 22 / (1 - 0,20) = 22 / 0,80 = 27,50 €. (26,40 € correspond à une marge sur le coût d'achat)."
+        },
+        {
+          "q": "Pour constituer une entreprise individuelle (EI) sous le régime classique ou micro, quel est le capital social minimum requis par la loi ?",
+          "options": ["A. 1 €", "B. 7 500 €", "C. Aucun capital social minimum n'est requis par la loi.", "D. 13 000 €"],
+          "answer": 2,
+          "expl": "L'entreprise individuelle n'ayant pas la structure d'une société commerciale, elle ne possède pas de capital social. Aucun minimum n'est donc exigé."
+        }
+      ]
+    }
+  ];
+}
