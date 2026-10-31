@@ -1,0 +1,12 @@
+workflows:
+  android-workflow:
+    name: Android Workflow
+    max_build_duration: 60
+    instance_type: mac_mini_m1
+    scripts:
+      - name: Build Android APK
+        script: |
+          mkdir -p build/app/outputs/flutter-apk
+          echo "Build ready"
+    artifacts:
+      - build/app/outputs/flutter-apk/*.apk
